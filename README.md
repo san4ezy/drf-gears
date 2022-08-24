@@ -1,6 +1,6 @@
 # DRF gears ⚙ ⚙ ⚙
 
-Some cogs collection for getting life a little better.
+Some gears collection for getting life a little bit better.
 
 ## Installation
 
