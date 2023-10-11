@@ -6,14 +6,15 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="drf-gears",
-    version="0.8.0",
+    version="0.8.1",
     author="Alexander Yudkin",
     author_email="san4ezy@gmail.com",
     description="Some gears collection for getting life a little bit better.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/san4ezy/drf-gears",
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(where='src'),
+    package_dir={'': 'src'},
     include_package_data=True,
     classifiers=[
         'Environment :: Web Environment',
