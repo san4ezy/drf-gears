@@ -39,14 +39,11 @@ class OnChangeModel(models.Model):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        print("\nINIT")
         for name in self.get_on_change_fields():
-            print(name, self.get_origin_name(name), getattr(self, name, None))
             setattr(self, self.get_origin_name(name), getattr(self, name, None))
 
     def save(self, *args, **kwargs):
         self.process_changed_fields()
-        print(self.name)
         super().save(*args, **kwargs)
         self.after_save()
 
