@@ -1,0 +1,15 @@
+.idea/
+*__pycache__*
+*.log
+rest-api.http
+.env.local
+*.pyc
+Makefile
+.venv
+djangoproject/
+main/
+db.sqlite3
+Makefile
+manage.py
+mixins.py
+_trash
