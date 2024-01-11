@@ -32,6 +32,8 @@ class OnChangeModel(models.Model):
 
     on_change_fields = ()
     on_change_prefix = 'on_change_'
+    post_change_fields = ()
+    post_change_prefix = 'post_change_'
     origin_prefix = '__origin_'
 
     class Meta:
@@ -43,11 +45,15 @@ class OnChangeModel(models.Model):
             setattr(self, self.get_origin_name(name), getattr(self, name, None))
 
     def save(self, *args, **kwargs):
-        self.process_changed_fields()
+        changed_fields = self.get_changed_fields()
+        self.process_changed_fields(self.on_change_prefix, changed_fields)
         super().save(*args, **kwargs)
+        self.process_changed_fields(self.post_change_prefix, changed_fields)
         self.after_save()
 
-    def execute_on_change_method(self, origin_name, origin_value, name, value) -> bool:
+    def execute_change_method(
+            self, prefix, origin_name, origin_value, name, value,
+    ) -> bool:
         """
         This method executes the custom model's on_change method.
         On_change methods could impact on the values will be set. So take care
@@ -55,6 +61,7 @@ class OnChangeModel(models.Model):
         The status is a boolean indicator of the on_change method, where True means
         this field should be passed to the main on_change method, and False
         means it shouldn't.
+        :param prefix: maybe on_change or post_change
         :param origin_name: the prefixed name of an attribute where the original value
         is stored
         :param origin_value: the original value of the field
@@ -62,7 +69,7 @@ class OnChangeModel(models.Model):
         :param value: new value of the field
         :return: status - must be processed by the main on_change method or must not.
         """
-        method = self._get_method(name)
+        method = self._get_method(prefix, name)
         if not method:
             return True  # must be processed by the main on_change method
         _status = method(origin_value, value)
@@ -78,19 +85,24 @@ class OnChangeModel(models.Model):
     def get_origin_value(self, origin_name):
         return getattr(self, origin_name)
 
-    def process_changed_fields(self):
-        changed_fields = self.get_changed_fields()
-        on_change_attrs = []
+    def process_changed_fields(self, prefix, changed_fields):
+        change_attrs = []
         for origin_name, origin_value, name, value in changed_fields:
             attrs = origin_name, origin_value, name, value
-            status = self.execute_on_change_method(*attrs)
+            status = self.execute_change_method(prefix, *attrs)
             if status is True:
-                on_change_attrs.append(attrs)
-        self.on_change(on_change_attrs)
+                change_attrs.append(attrs)
+        self.batch_change(prefix, change_attrs)
 
     def after_save(self):
         """Customize it on your taste"""
         pass
+
+    def batch_change(self, prefix: str, fields: List[Tuple]):
+        if prefix == self.on_change_prefix:
+            return self.on_change(fields)
+        elif prefix == self.post_change_prefix:
+            return self.post_change(fields)
 
     def on_change(self, fields: List[Tuple]):
         """
@@ -101,8 +113,22 @@ class OnChangeModel(models.Model):
         These method will be processed automatically, based on th `on_change_prefix`
         attribute.
         """
-        for origin_name, origin_value, name, value in fields:
-            pass  # handle logic here
+        # for origin_name, origin_value, name, value in fields:
+        #     pass  # handle logic here
+        pass
+
+    def post_change(self, fields: List[Tuple]):
+        """
+        This method allows to implement the logic based on the whole
+        changed fields list. It works only with the field defined in the
+        `post_change_fields` attribute. If you need to handel a single field only you
+        should use the model's method named like `post_change_FIELD_NAME`.
+        These method will be processed automatically, based on th `post_change_prefix`
+        attribute.
+        """
+        # for origin_name, origin_value, name, value in fields:
+        #     pass  # handle logic here
+        pass
 
     def get_on_change_fields(self):
         # Combine manually added fields with the defined through method fields
@@ -124,8 +150,8 @@ class OnChangeModel(models.Model):
             if value != origin_value:
                 yield origin_name, origin_value, name, value
 
-    def _get_method(self, field_name: str):
-        method_name = f'{self.on_change_prefix}{field_name}'
+    def _get_method(self, prefix, field_name: str):
+        method_name = f'{prefix}{field_name}'
         try:
             return getattr(self, method_name)
         except AttributeError:
