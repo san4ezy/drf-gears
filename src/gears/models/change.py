@@ -41,14 +41,16 @@ class OnChangeModel(models.Model):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for name in self.get_on_change_fields():
+        self._on_change_fields = self.get_on_change_fields()
+        self._post_change_fields = self.get_post_change_fields()
+        fields = self._on_change_fields + self._post_change_fields
+        for name in set(fields):
             setattr(self, self.get_origin_name(name), getattr(self, name, None))
 
     def save(self, *args, **kwargs):
-        changed_fields = self.get_changed_fields()
-        self.process_changed_fields(self.on_change_prefix, changed_fields)
+        self.process_changed_fields(self.on_change_prefix)
         super().save(*args, **kwargs)
-        self.process_changed_fields(self.post_change_prefix, changed_fields)
+        self.process_changed_fields(self.post_change_prefix)
         self.after_save()
 
     def execute_change_method(
@@ -76,7 +78,7 @@ class OnChangeModel(models.Model):
         # This is a compatibility part. Previous lib version might return nothing.
         _status = True if _status is None else _status
         # set new value as original value preventing extra method execution
-        setattr(self, origin_name, value)
+        # setattr(self, origin_name, value)
         return _status
 
     def get_origin_name(self, name):
@@ -85,7 +87,8 @@ class OnChangeModel(models.Model):
     def get_origin_value(self, origin_name):
         return getattr(self, origin_name)
 
-    def process_changed_fields(self, prefix, changed_fields):
+    def process_changed_fields(self, prefix):
+        changed_fields = self.get_changed_fields(prefix)
         change_attrs = []
         for origin_name, origin_value, name, value in changed_fields:
             attrs = origin_name, origin_value, name, value
@@ -132,18 +135,30 @@ class OnChangeModel(models.Model):
 
     def get_on_change_fields(self):
         # Combine manually added fields with the defined through method fields
-        fields = self.get_on_change_methods()
+        fields = self.get_change_methods(self.on_change_prefix)
         fields.extend(self.on_change_fields)
         return fields
 
-    def get_on_change_methods(self):
-        def is_on_change_method(a):
-            return a.startswith(self.on_change_prefix) and callable(getattr(self, a))
-        l = len(self.on_change_prefix)
-        return [attr[l:] for attr in dir(self) if is_on_change_method(attr)]
+    def get_post_change_fields(self):
+        # Combine manually added fields with the defined through method fields
+        fields = self.get_change_methods(self.post_change_prefix)
+        fields.extend(self.post_change_fields)
+        return fields
 
-    def get_changed_fields(self) -> List[Tuple]:
-        for name in self.get_on_change_fields():
+    def get_change_methods(self, prefix):
+        def is_change_method(a):
+            return a.startswith(prefix) and callable(getattr(self, a))
+        l = len(prefix)
+        return [attr[l:] for attr in dir(self) if is_change_method(attr)]
+
+    def get_changed_fields(self, prefix) -> List[Tuple]:
+        if prefix == self.on_change_prefix:
+            fields = self._on_change_fields
+        elif prefix == self.post_change_prefix:
+            fields = self._post_change_fields
+        else:
+            raise AttributeError("Wrong prefix")
+        for name in fields:
             origin_name = self.get_origin_name(name)
             origin_value = self.get_origin_value(origin_name)
             value = getattr(self, name)
