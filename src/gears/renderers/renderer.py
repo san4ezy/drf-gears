@@ -20,6 +20,9 @@ class APIRenderer(JSONRenderer):
             pagination=pagination,
             errors=self.get_errors(success, data, renderer_context),
             data=self.get_data(success, pagination, data, renderer_context),
+            service_data=self.get_service_data(
+                success, pagination, data, renderer_context,
+            ),
         )
 
     def render(self, data, accepted_media_type=None, renderer_context=None):
@@ -35,16 +38,13 @@ class APIRenderer(JSONRenderer):
 
     def get_pagination(self, data) -> Union[dict, None]:
         try:
-            c, n, p = data.get('count'), data.get('next'), data.get('previous')
+            pagination_data = {
+                k: v for k, v in data.items() if k != self.pagination_result_field
+            }
         except AttributeError:
-            return
-        else:
-            if c is not None:
-                return dict(
-                    count=c,
-                    next=n,
-                    previous=p,
-                )
+            pagination_data = {}
+        if pagination_data.get('count') is not None:
+            return pagination_data
 
     def get_data(
             self, success: bool, pagination, data, renderer_context,
@@ -54,3 +54,10 @@ class APIRenderer(JSONRenderer):
         if not pagination:
             return data
         return data[self.pagination_result_field]
+
+    def get_service_data(
+            self, success: bool, pagination, data, renderer_context,
+    ) -> Union[dict, list, None]:
+        if not success:
+            return
+        return renderer_context.get('service')

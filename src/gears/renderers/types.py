@@ -17,3 +17,4 @@ class Response:
     pagination: Union[dict, None]
     errors: Union[Error, list]
     data: Union[dict, list, None]
+    service_data: Union[dict, list, None]
