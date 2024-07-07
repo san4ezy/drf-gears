@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Set
 
 from django.db import models
 
@@ -46,11 +46,13 @@ class OnChangeModel(models.Model):
         fields = self._on_change_fields + self._post_change_fields
         for name in set(fields):
             setattr(self, self.get_origin_name(name), getattr(self, name, None))
+        setattr(self, self.get_origin_name('counter'), 0)
 
     def save(self, *args, **kwargs):
-        self.process_changed_fields(self.on_change_prefix)
+        self.process_changed_fields(self.on_change_prefix, *args, **kwargs)
         super().save(*args, **kwargs)
-        self.process_changed_fields(self.post_change_prefix)
+        self._increase_counter()
+        self.process_changed_fields(self.post_change_prefix, *args, **kwargs)
         self.after_save()
 
     def execute_change_method(
@@ -87,8 +89,12 @@ class OnChangeModel(models.Model):
     def get_origin_value(self, origin_name):
         return getattr(self, origin_name)
 
-    def process_changed_fields(self, prefix):
-        changed_fields = self.get_changed_fields(prefix)
+    def process_changed_fields(self, prefix, *args, **kwargs):
+        update_fields = set(kwargs.get('update_fields', []))
+        changed_fields = set(self.get_changed_fields(prefix))
+        if update_fields:
+            # exclude all another fields if we use the `update_fields` option
+            changed_fields = changed_fields.intersection(update_fields)
         change_attrs = []
         for origin_name, origin_value, name, value in changed_fields:
             attrs = origin_name, origin_value, name, value
@@ -151,19 +157,26 @@ class OnChangeModel(models.Model):
         l = len(prefix)
         return [attr[l:] for attr in dir(self) if is_change_method(attr)]
 
-    def get_changed_fields(self, prefix) -> List[Tuple]:
+    def get_changed_fields(self, prefix) -> Set[Tuple]:
         if prefix == self.on_change_prefix:
             fields = self._on_change_fields
         elif prefix == self.post_change_prefix:
             fields = self._post_change_fields
         else:
             raise AttributeError("Wrong prefix")
-        for name in fields:
+        for name in set(fields):
             origin_name = self.get_origin_name(name)
             origin_value = self.get_origin_value(origin_name)
             value = getattr(self, name)
             if value != origin_value:
                 yield origin_name, origin_value, name, value
+
+    def get_on_change_counter(self):
+        return self.get_origin_value(self.get_origin_name('counter'))
+
+    @property
+    def is_saved(self):
+        return self.get_on_change_counter() > 0
 
     def _get_method(self, prefix, field_name: str):
         method_name = f'{prefix}{field_name}'
@@ -172,3 +185,7 @@ class OnChangeModel(models.Model):
         except AttributeError:
             # f'OnChangeModel has no method {method_name}'
             return
+
+    def _increase_counter(self):
+        counter = self.get_on_change_counter()
+        setattr(self, self.get_origin_name('counter'), counter + 1)
