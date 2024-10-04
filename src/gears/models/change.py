@@ -43,16 +43,16 @@ class OnChangeModel(models.Model):
         super().__init__(*args, **kwargs)
         self._on_change_fields = self.get_on_change_fields()
         self._post_change_fields = self.get_post_change_fields()
-
-        # fix the adding state to be actual for post_change method
-        self.__state_adding: bool = self._state.adding
-
+        self.__state_adding = None
         fields = self._on_change_fields + self._post_change_fields
         for name in set(fields):
             setattr(self, self.get_origin_name(name), getattr(self, name, None))
         setattr(self, self.get_origin_name('counter'), 0)
 
     def save(self, *args, **kwargs):
+        # fix the adding state to be actual for post_change method
+        self.__state_adding: bool = self._state.adding
+
         self.process_changed_fields(self.on_change_prefix, *args, **kwargs)
         super().save(*args, **kwargs)
         self.process_changed_fields(self.post_change_prefix, *args, **kwargs)
@@ -80,7 +80,7 @@ class OnChangeModel(models.Model):
         method = self._get_method(prefix, name)
         if not method:
             return True  # must be processed by the main on_change method
-        _status = method(origin_value, value)
+        _status = method(origin_value, value, self.__state_adding, **kwargs)
         # This is a compatibility part. Previous lib version might return nothing.
         _status = True if _status is None else _status
         # set new value as original value preventing extra method execution
@@ -117,7 +117,7 @@ class OnChangeModel(models.Model):
         elif prefix == self.post_change_prefix:
             return self.post_change(fields, self.__state_adding)
 
-    def on_change(self, fields: List[Tuple], adding: bool):
+    def on_change(self, fields: List[Tuple], adding: bool, **kwargs):
         """
         This method allows to implement the logic based on the whole
         changed fields list. It works only with the field defined in the
@@ -130,7 +130,7 @@ class OnChangeModel(models.Model):
         #     pass  # handle logic here
         pass
 
-    def post_change(self, fields: List[Tuple], adding: bool):
+    def post_change(self, fields: List[Tuple], adding: bool, **kwargs):
         """
         This method allows to implement the logic based on the whole
         changed fields list. It works only with the field defined in the
