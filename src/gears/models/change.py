@@ -51,8 +51,8 @@ class OnChangeModel(models.Model):
     def save(self, *args, **kwargs):
         self.process_changed_fields(self.on_change_prefix, *args, **kwargs)
         super().save(*args, **kwargs)
-        self._increase_counter()
         self.process_changed_fields(self.post_change_prefix, *args, **kwargs)
+        self._increase_counter()
         self.after_save()
 
     def execute_change_method(
@@ -90,13 +90,13 @@ class OnChangeModel(models.Model):
         return getattr(self, origin_name)
 
     def process_changed_fields(self, prefix, *args, **kwargs):
-        update_fields = set(kwargs.get('update_fields', []))
-        changed_fields = set(self.get_changed_fields(prefix))
-        if update_fields:
-            # exclude all another fields if we use the `update_fields` option
-            changed_fields = changed_fields.intersection(update_fields)
+        update_fields = kwargs.get('update_fields', [])
+        changed_fields = self.get_changed_fields(prefix)
         change_attrs = []
         for origin_name, origin_value, name, value in changed_fields:
+            if update_fields and name not in update_fields:
+                # exclude all another fields if we use the `update_fields` option
+                continue
             attrs = origin_name, origin_value, name, value
             status = self.execute_change_method(prefix, *attrs)
             if status is True:
@@ -164,7 +164,7 @@ class OnChangeModel(models.Model):
             fields = self._post_change_fields
         else:
             raise AttributeError("Wrong prefix")
-        for name in set(fields):
+        for name in fields:
             origin_name = self.get_origin_name(name)
             origin_value = self.get_origin_value(origin_name)
             value = getattr(self, name)
