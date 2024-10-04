@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="drf-gears",
-    version="0.9.19",
+    version="0.9.20",
     author="Alexander Yudkin",
     author_email="san4ezy@gmail.com",
     description="Some gears collection for getting life a little bit better.",

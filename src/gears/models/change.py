@@ -80,7 +80,7 @@ class OnChangeModel(models.Model):
         method = self._get_method(prefix, name)
         if not method:
             return True  # must be processed by the main on_change method
-        _status = method(origin_value, value, self.__state_adding, **kwargs)
+        _status = method(origin_value, value, self.__state_adding)  # kwargs could be sent
         # This is a compatibility part. Previous lib version might return nothing.
         _status = True if _status is None else _status
         # set new value as original value preventing extra method execution
@@ -113,9 +113,9 @@ class OnChangeModel(models.Model):
 
     def batch_change(self, prefix: str, fields: List[Tuple]):
         if prefix == self.on_change_prefix:
-            return self.on_change(fields, self.__state_adding)
+            return self.on_change(fields, self.__state_adding)  # kwargs could be sent
         elif prefix == self.post_change_prefix:
-            return self.post_change(fields, self.__state_adding)
+            return self.post_change(fields, self.__state_adding)  # kwargs could be sent
 
     def on_change(self, fields: List[Tuple], adding: bool, **kwargs):
         """
