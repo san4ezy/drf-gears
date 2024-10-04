@@ -43,6 +43,10 @@ class OnChangeModel(models.Model):
         super().__init__(*args, **kwargs)
         self._on_change_fields = self.get_on_change_fields()
         self._post_change_fields = self.get_post_change_fields()
+
+        # fix the adding state to be actual for post_change method
+        self.__state_adding: bool = self._state.adding
+
         fields = self._on_change_fields + self._post_change_fields
         for name in set(fields):
             setattr(self, self.get_origin_name(name), getattr(self, name, None))
@@ -109,11 +113,11 @@ class OnChangeModel(models.Model):
 
     def batch_change(self, prefix: str, fields: List[Tuple]):
         if prefix == self.on_change_prefix:
-            return self.on_change(fields)
+            return self.on_change(fields, self.__state_adding)
         elif prefix == self.post_change_prefix:
-            return self.post_change(fields)
+            return self.post_change(fields, self.__state_adding)
 
-    def on_change(self, fields: List[Tuple]):
+    def on_change(self, fields: List[Tuple], adding: bool):
         """
         This method allows to implement the logic based on the whole
         changed fields list. It works only with the field defined in the
@@ -126,7 +130,7 @@ class OnChangeModel(models.Model):
         #     pass  # handle logic here
         pass
 
-    def post_change(self, fields: List[Tuple]):
+    def post_change(self, fields: List[Tuple], adding: bool):
         """
         This method allows to implement the logic based on the whole
         changed fields list. It works only with the field defined in the
