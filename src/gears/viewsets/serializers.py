@@ -7,18 +7,18 @@ class SerializersMixin(object):
     to the action, request, type so on.
 
     Example:
-        serializers = dict(
-            None=DefaultSerializer,  # will be used this one if none of rest are not suitable
-            list=ListSerializer,  # will be used for the list() method of ViewSet
-            retrieve=RetrieveSerializer,  # will be used for the retrieve() method of ViewSet
-            create=CreateSerializer,  # will be used for the create() method of ViewSet
-            update=UpdateSerializer,  # will be used for the update() method of ViewSet
-            partial_update=UpdateSerializer,  # will be used for the partial_update() method of ViewSet
-            destroy=DestroySerializer,  # will be used for the destroy() method of ViewSet
-            read_only=ReadOnlySerializer,  # will be used for the list() and retrieve() methods of ViewSet
-            write_only=WriteOnlySerializer,  # will be used for the create(), update() and partial_update() methods of ViewSet
-            custom_action=CustomActionSerializer,  # will be used for the custom ViewSet method named as `custom_action`
-            my_serializer=MySerializer,  # will be used if the serializer_name attribute is set
+        serializers = {
+            None: DefaultSerializer,  # will be used this one if none of rest are not suitable
+            "list": ListSerializer,  # will be used for the list() method of ViewSet
+            "retrieve": RetrieveSerializer,  # will be used for the retrieve() method of ViewSet
+            "create": CreateSerializer,  # will be used for the create() method of ViewSet
+            "update": UpdateSerializer,  # will be used for the update() method of ViewSet
+            "partial_update": UpdateSerializer,  # will be used for the partial_update() method of ViewSet
+            "destroy": DestroySerializer,  # will be used for the destroy() method of ViewSet
+            "read_only": ReadOnlySerializer,  # will be used for the list() and retrieve() methods of ViewSet
+            "write_only": WriteOnlySerializer,  # will be used for the create(), update() and partial_update() methods of ViewSet
+            "custom_action": CustomActionSerializer,  # will be used for the custom ViewSet method named as `custom_action`
+            "my_serializer": MySerializer,  # will be used if the serializer_name attribute is set
 
             # NOT IMPLEMENTED YET
             # get=GetOnlySerializer,  # will be used for the GET requests of ViewSet
@@ -27,19 +27,18 @@ class SerializersMixin(object):
             # patch=PatchOnlySerializer,  # will be used for the PATCH requests of ViewSet
             # delete=DeleteOnlySerializer,  # will be used for the DELETE requests of ViewSet
 
-        )
+        }
 
     Priority: specified by name, action, method, default
     """
     serializers = {}
-    serializer_class = None
     default_serializer_name = None  # None as a key for dict
-    _serializers = {
-        default_serializer_name: serializer_class,
-    }
+    _serializers = {}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if hasattr(self, "serializer_class"):
+            self._serializers[self.default_serializer_name] = self.serializer_class
 
         # Back consistency warning
         _d = "default"
@@ -52,14 +51,14 @@ class SerializersMixin(object):
                 "Notice that it was renamed: default_name -> default_serializer_name."
             )
 
-        if not self.serializer_class and not self.serializers.get(
-                self.default_serializer_name
-        ):
+        self._serializers.update(self.serializers)
+
+        if self.default_serializer_name not in self.serializers:
             raise ValueError(
                 "Need to specify either 'serializer_class' or "
                 "serializer's default class"
             )
-        self._serializers.update(self.serializers)
+
 
     def get_serializer_class(self, serializer_name=None):
         return (
