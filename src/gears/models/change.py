@@ -48,6 +48,7 @@ class OnChangeModel(models.Model):
         for name in set(fields):
             setattr(self, self.get_origin_name(name), getattr(self, name, None))
         setattr(self, self.get_origin_name('counter'), 0)
+        setattr(self, self.get_origin_name('called_methods'), [])
 
     def save(self, *args, **kwargs):
         # fix the adding state to be actual for post_change method
@@ -85,6 +86,7 @@ class OnChangeModel(models.Model):
         _status = True if _status is None else _status
         # set new value as original value preventing extra method execution
         # setattr(self, origin_name, value)
+        self._add_called_method(method.__name__)
         return _status
 
     def get_origin_name(self, name):
@@ -193,3 +195,15 @@ class OnChangeModel(models.Model):
     def _increase_counter(self):
         counter = self.get_on_change_counter()
         setattr(self, self.get_origin_name('counter'), counter + 1)
+
+    def _add_called_method(self, method_name: str):
+        # can contain duplicates
+        called_methods = self.get_called_methods()
+        called_methods.append(method_name)
+        setattr(self, self.get_origin_name('called_methods'), called_methods)
+
+    def get_called_methods(self):
+        return self.get_origin_value(self.get_origin_name('called_methods'))
+        
+    def is_called(self, method_name: str):
+        return method_name in self.get_called_methods()
